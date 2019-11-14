@@ -22,7 +22,7 @@ import re
 ####preliminary analisys####
 
 #Loads all business in business.json
-business = pd.read_json(r'F:\Mestrado\Computacao\KDD\TrabalhoFinal\dados\business.json', lines=True)
+business = pd.read_json(r'business.json', lines=True)
 business.columns
 # Get names of indexes for which column city has value different from Toronto
 indexNames = business[ business['city'] != "Toronto" ].index
@@ -155,15 +155,44 @@ categoriesToRemove = [
                         ]
 
 # Remove the categories
-pat = r'\b(?:{})\b'.format('|'.join(categoriesToRemove))
-restaurants_and_food_j['categories'] = restaurants_and_food_j['categories'].str.replace(pat, '')
-restaurants_and_food_j['categories'] = restaurants_and_food_j['categories'].str.replace(', ,', ',')
+# pat = r'\b(?:{})\b'.format('|'.join(categoriesToRemove))
+# restaurants_and_food_j['categories'] = restaurants_and_food_j['categories'].str.replace(pat, '')
+# restaurants_and_food_j['categories'] = restaurants_and_food_j['categories'].str.replace(', ,', ',')
 
 
+# NEW CODE - CHANGED 13/11/2019
+##########################################################################################################################################################################
+import copy
+def categories_cleanup(str, categoriesToRemove):
+    '''
+    Function created to take as input a string from the 'categories' column and output the same string without items from the 
+    categoriesToRemove array.
+    '''
+    words_list = str.split(', ')
+    words_list_copy = copy.deepcopy(words_list) #this copy is necessary because you can't delete items from a list you're iterating over
+    for i in words_list:
+        if i in categoriesToRemove:
+            words_list_copy.remove(i)
 
+    new_str = ", ".join(words_list_copy)
+    # return the new string after removing the "bad" categories
+    return new_str
 
-#takes a dataframe as an input, as well as a list of columns that are dictionaries
-#takes each column that is a dictionary, and expands it into a series of dummy columns
+# Removing categories that don't matter from the dataset, and entries that have no categories
+restaurants_and_food_j_copy = copy.deepcopy(restaurants_and_food_j)
+
+var = 0
+for i in range(len(restaurants_and_food_j['categories'])):
+    restaurants_and_food_j.iloc[i,restaurants_and_food_j.columns.get_loc('categories')] = categories_cleanup(restaurants_and_food_j['categories'][i], categoriesToRemove)
+    if restaurants_and_food_j['categories'][i] != '':
+        restaurants_and_food_j_copy.iloc[var] = restaurants_and_food_j.iloc[i]
+        var += 1
+
+restaurants_and_food_j = copy.deepcopy(restaurants_and_food_j_copy)
+###########################################################################################################################################################################
+
+# takes a dataframe as an input, as well as a list of columns that are dictionaries
+# takes each column that is a dictionary, and expands it into a series of dummy columns
 
 def create_attributes(df, dictList):
     
