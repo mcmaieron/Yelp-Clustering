@@ -12,17 +12,24 @@ from shapely.geometry import Point
 import numpy as np
 from kmodes.kprototypes import KPrototypes
 import mca
+from sklearn.preprocessing import normalize
 from sklearn.metrics import  silhouette_score
 from sklearn.cluster import KMeans
 from scipy.spatial import distance
-from sklearn.cluster import KMeans
-import re
+from scipy.spatial.distance import pdist
+from scipy.spatial.distance import squareform
+import prince
+import string
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.metrics.pairwise import cosine_distances
+from sklearn.feature_extraction.text import CountVectorizer
+from scipy.cluster.hierarchy import dendrogram, linkage
 
 #from fuzzywuzzy import fuzz
 ####preliminary analisys####
 
 #Loads all business in business.json
-business = pd.read_json(r'business.json', lines=True)
+business = pd.read_json(r'F:\Mestrado\Computacao\KDD\TrabalhoFinal\dados\business.json', lines=True)
 business.columns
 # Get names of indexes for which column city has value different from Toronto
 indexNames = business[ business['city'] != "Toronto" ].index
@@ -155,10 +162,9 @@ categoriesToRemove = [
                         ]
 
 # Remove the categories
-# pat = r'\b(?:{})\b'.format('|'.join(categoriesToRemove))
-# restaurants_and_food_j['categories'] = restaurants_and_food_j['categories'].str.replace(pat, '')
-# restaurants_and_food_j['categories'] = restaurants_and_food_j['categories'].str.replace(', ,', ',')
-
+#pat = r'\b(?:{})\b'.format('|'.join(categoriesToRemove))
+#restaurants_and_food_j['categories'] = restaurants_and_food_j['categories'].str.replace(pat, '')
+#restaurants_and_food_j['categories'] = restaurants_and_food_j['categories'].str.replace(', ,', ',')
 
 # NEW CODE - CHANGED 13/11/2019
 ##########################################################################################################################################################################
@@ -189,10 +195,11 @@ for i in range(len(restaurants_and_food_j['categories'])):
         var += 1
 
 restaurants_and_food_j = copy.deepcopy(restaurants_and_food_j_copy)
-###########################################################################################################################################################################
+####################################################################################################################################
 
-# takes a dataframe as an input, as well as a list of columns that are dictionaries
-# takes each column that is a dictionary, and expands it into a series of dummy columns
+
+#takes a dataframe as an input, as well as a list of columns that are dictionaries
+#takes each column that is a dictionary, and expands it into a series of dummy columns
 
 def create_attributes(df, dictList):
     
@@ -214,11 +221,11 @@ def create_attributes(df, dictList):
 
 
 l = ['attributes']
-exp_rest = create_attributes(restaurants_and_food_j,l)
+exp_rest = create_attributes(restaurants_and_food_j_copy,l)
 
 ## Drop columns that does not fit in the domain or that have the same value for 
 ## all instances
-exp_rest.drop(['HairSpecializesIn','BusinessAcceptsCreditCards'], axis=1,inplace=True)
+exp_rest.drop(['HairSpecializesIn','BusinessAcceptsCreditCards','BusinessAcceptsBitcoin','AgesAllowed'], axis=1,inplace=True)
 
 ## Standardize values that mean the same thing
 exp_rest.WiFi.replace(["u'free'","'free'"],'free',inplace=True)
@@ -283,18 +290,196 @@ for j in exp_rest:
     elif j=='DietaryRestrictions':
         exp_rest[j].replace([np.nan,'None'],"{'dairy-free': False, 'gluten-free': False, 'vegan': False, 'kosher': False, 'halal': False, 'soy-free': False, 'vegetarian': False}" , inplace=True)
         
+# NEW CODE - CHANGED 04/12/2019
+##########################################################################################################################################################################
 
-exp_rest['RestaurantsPriceRange2'].value_counts()
-## Reduce dimensions
+# Calculates distance matrix of columns with numeric or boolean data
+
+res = pdist(exp_rest[['stars']], 'euclidean')
+dist_stars =squareform(res)
+dist_stars =normalize(squareform(res),norm='max')
+
+res = pdist(exp_rest[['RestaurantsPriceRange2']], 'euclidean')
+dist_price=normalize(squareform(res),norm='max')
+
+def calc_dist_bool (field):
+    vect = CountVectorizer().fit_transform(field)
+    vectors = vect.toarray() 
+    dist = cosine_distances(vectors)
+    return dist   
+
+dist_bike = calc_dist_bool(exp_rest['BikeParking'])
+dist_take =calc_dist_bool(exp_rest['RestaurantsTakeOut'])
+dist_caters = calc_dist_bool(exp_rest['Caters'])
+dist_reservations = calc_dist_bool(exp_rest['RestaurantsReservations'])
+dist_kids = calc_dist_bool(exp_rest['GoodForKids'])
+dist_out = calc_dist_bool(exp_rest['OutdoorSeating'])
+dist_delivery = calc_dist_bool(exp_rest['RestaurantsDelivery']) 
+dist_groups = calc_dist_bool(exp_rest['RestaurantsGoodForGroups'])
+dist_wheel = calc_dist_bool(exp_rest['WheelchairAccessible'])
+dist_dancing = calc_dist_bool(exp_rest['GoodForDancing'])
+dist_dogs = calc_dist_bool(exp_rest['DogsAllowed'])
+dist_tv = calc_dist_bool(exp_rest['HasTV'])
+dist_table = calc_dist_bool(exp_rest['RestaurantsTableService'])
+dist_drive = calc_dist_bool(exp_rest['DriveThru'])
+dist_appo = calc_dist_bool(exp_rest['ByAppointmentOnly'])
+dist_happy = calc_dist_bool(exp_rest['HappyHour'])
+dist_coat = calc_dist_bool(exp_rest['CoatCheck'])
+
+#w = len(exp_rest.index)
+#dist = np.zeros(shape=(w,w))
+#for j in exp_rest:
+#    if j in [
+#            'BikeParking','RestaurantsTakeOut',
+#            'Caters', 'RestaurantsReservations',
+#            'GoodForKids','OutdoorSeating','RestaurantsDelivery','HasTV',
+#            'RestaurantsGoodForGroups','RestaurantsTableService','DogsAllowed',
+#            'WheelchairAccessible','DriveThru','ByAppointmentOnly','GoodForDancing',
+#            'HappyHour','CoatCheck'
+#           ]:
+#            print('coluna: ',j)
+#            vect = CountVectorizer().fit_transform(exp_rest[j])
+#            vectors = vect.toarray() 
+#            dist = np.dstack((dist,cosine_distances(vectors)))
+
+
+# Calculates distance matrix of text columns    
+def clean_string (text):
+    text = ''.join([word for word in text if word not in string.punctuation])
+    text = text.lower()
+    return text
+
+def calc_dist_text (field):
+    cleaned = (map(clean_string, field))
+    vect = CountVectorizer().fit_transform(cleaned)
+    vectors = vect.toarray() 
+    dist = cosine_distances(vectors)
+    return dist  
+
+def calc_dist_text_vec (field):
+    cleaned = (map(clean_string, field))
+    vect = CountVectorizer().fit_transform(cleaned)
+    vectors = vect.toarray() 
+    return vectors  
+
+
+dist_cat = calc_dist_text(exp_rest.categories)
+dist_business = calc_dist_text(exp_rest.BusinessParking)
+dist_att = calc_dist_text(exp_rest.RestaurantsAttire)
+dist_alcohol = calc_dist_text(exp_rest.Alcohol)
+dist_noise = calc_dist_text(exp_rest.NoiseLevel)
+dist_wifi = calc_dist_text(exp_rest.WiFi)
+dist_ambience = calc_dist_text(exp_rest.Ambience)
+dist_smoking = calc_dist_text(exp_rest.Smoking)
+dist_music = calc_dist_text(exp_rest.Music)
+dist_nights = calc_dist_text(exp_rest.BestNights)
+dist_meal = calc_dist_text(exp_rest.GoodForMeal)
+dist_dietary = calc_dist_text(exp_rest.DietaryRestrictions)
+
+
+# Sum all distance matrix and normalizes
+
+dist =normalize((dist_alcohol  + dist_ambience + dist_nights + dist_dietary + dist_meal 
++ dist_nights + dist_music + dist_smoking + dist_wifi + dist_noise + dist_att 
++ dist_business + dist_cat + dist_coat + dist_happy+ dist_appo + dist_drive 
++ dist_table + dist_tv + dist_dogs + dist_dancing + dist_wheel + dist_groups  
++ dist_delivery + dist_out + dist_kids + dist_caters + dist_take
++ dist_bike + dist_price + dist_stars),norm='max')
+
+
+
+## calculates silhoette coeficient in a max number of cluster and plots it
+def evaluate_silhoette(dist, max_clusters):
+    error = np.zeros(max_clusters+1)
+    error[0] = 0;
+    link = ['complete', 'average', 'single']
+    for i in link:        
+        for k in range(19,max_clusters+1):
+           model2 = AgglomerativeClustering(linkage=i,n_clusters= k, affinity = 'precomputed')
+           labels = model2.fit_predict(dist)
+           error[k] = silhouette_score(dist, labels, metric='precomputed')
+           print('N_cluster: ',k, 'Avg silhoette: ',error[k])
+    fig, ax = plt.subplots()
+    plt.title('Agglomerative Clustering')
+    ax.plot(range(1,len(error)),error[1:],label=i)
+    plt.xlabel('Number of clusters')
+    plt.ylabel('Silhoette coeficient')
+    plt.legend(title='Linkage criteria:')
+    plt.show()
+
+evaluate_silhoette(dist, 20)
+
+#plot dendogram
+def plot_dendrogram(model, **kwargs):
+
+    # Children of hierarchical clustering
+    children = model.children_
+
+    # Distances between each pair of children
+    # Since we don't have this information, we can use a uniform one for plotting
+    distance = np.arange(children.shape[0])
+
+    # The number of observations contained in each cluster level
+    no_of_observations = np.arange(2, children.shape[0]+2)
+
+    # Create linkage matrix and then plot the dendrogram
+    linkage_matrix = np.column_stack([children, distance, no_of_observations]).astype(float)
+
+    # Plot the corresponding dendrogram
+    dendrogram(linkage_matrix, **kwargs)
+
+
+model = AgglomerativeClustering(linkage='average',n_clusters= 15, affinity = 'precomputed')
+
+model = model.fit(dist)
+fig,ax = plt.subplots(figsize = (45,45),dpi=400)
+plt.title('Hierarchical Clustering Dendrogram')
+plot_dendrogram(model, labels=model.labels_, orientation='left',truncate_mode='level',p=12)
+plt.show()
+plt.savefig(r'F:\Mestrado\Computacao\KDD\TrabalhoFinal\apresentacao\dendogramDist.pdf')  
+
+# NEW CODE - CHANGED 13/11/2019
+##########################################################################################################################################################################
+## Reduce dimensions using MCA algorithm
 dum = pd.get_dummies(exp_rest['categories'])
 num_col = len(dum.columns)
 mca_ben = mca.MCA(dum,ncols=num_col)
+teste = (mca_ben.fs_r())
 factor = mca_ben.fs_r(N=2).T
+teste.L
+
 factort = factor.T 
 factort[:,0]
 exp_rest['Fac1'] = factort[:,0].tolist()
 exp_rest['Fac2'] = factort[:,1].tolist()
 
+
+
+
+mca = prince.MCA(
+     n_components=2,
+     n_iter=3,
+     copy=True,
+     check_input=True,
+     engine='auto',
+     random_state=42
+                 )
+mca = mca.fit(dum)
+mca.eigenvalues_
+mca.total_inertia_
+
+ax = mca.plot_coordinates(
+    X=dum,
+    ax=None,
+    figsize=(6, 6),
+    show_row_points=True,
+    row_points_size=10,
+    show_row_labels=False,
+    show_column_points=True,
+    column_points_size=30,
+    show_column_labels=False,
+    legend_n_cols=1
+    )
 ## End of pre-processing
         
 ##Start K-prototypes algorithm 
@@ -425,7 +610,8 @@ summary_cluster.to_csv(r'F:\Mestrado\Computacao\KDD\TrabalhoFinal\dados\summary_
 #loads US/Canada shapefile
 world = gpd.read_file('F:\Mestrado\Computacao\KDD\TrabalhoFinal\dados\shape_mundo\World_Countries.shp')
 toronto_boundaries = gpd.read_file(r'F:\Mestrado\Computacao\KDD\TrabalhoFinal\dados\toronto_boundaries\toronto_boundaries.shp')
-
+#Plots the world shape
+#world.plot(ax=ax, alpha=0.4, color="grey")
 #Set CRS as 4326 (WGS84)
 crs = {'init': 'epsg:4326'}    
 
