@@ -26,7 +26,6 @@ from sklearn.metrics.pairwise import cosine_distances
 from sklearn.feature_extraction.text import CountVectorizer
 from scipy.cluster.hierarchy import dendrogram, linkage
 
-#from fuzzywuzzy import fuzz
 ####preliminary analisys####
 
 #Loads all business in business.json
@@ -392,263 +391,265 @@ dist =normalize((dist_alcohol  + dist_ambience + dist_nights + dist_dietary + di
 ## calculates silhoette coeficient in a max number of cluster and plots it
 def evaluate_silhoette(dist, max_clusters):
     error = np.zeros(max_clusters+1)
-    error[0] = 0;
+    # error[0] = 0;
     link = ['complete', 'average', 'single']
+    fig, ax = plt.subplots()
     for i in link:        
         for k in range(19,max_clusters+1):
            model2 = AgglomerativeClustering(linkage=i,n_clusters= k, affinity = 'precomputed')
            labels = model2.fit_predict(dist)
            error[k] = silhouette_score(dist, labels, metric='precomputed')
            print('N_cluster: ',k, 'Avg silhoette: ',error[k])
-    fig, ax = plt.subplots()
+           ax.plot(range(1,len(error)),error[1:],label="%s,%i" % (i,k))
+
     plt.title('Agglomerative Clustering')
-    ax.plot(range(1,len(error)),error[1:],label=i)
     plt.xlabel('Number of clusters')
     plt.ylabel('Silhoette coeficient')
     plt.legend(title='Linkage criteria:')
+    plt.xlim(18,20)
     plt.show()
 
 evaluate_silhoette(dist, 20)
 
-#plot dendogram
-def plot_dendrogram(model, **kwargs):
+# #plot dendogram
+# def plot_dendrogram(model, **kwargs):
 
-    # Children of hierarchical clustering
-    children = model.children_
+#     # Children of hierarchical clustering
+#     children = model.children_
 
-    # Distances between each pair of children
-    # Since we don't have this information, we can use a uniform one for plotting
-    distance = np.arange(children.shape[0])
+#     # Distances between each pair of children
+#     # Since we don't have this information, we can use a uniform one for plotting
+#     distance = np.arange(children.shape[0])
 
-    # The number of observations contained in each cluster level
-    no_of_observations = np.arange(2, children.shape[0]+2)
+#     # The number of observations contained in each cluster level
+#     no_of_observations = np.arange(2, children.shape[0]+2)
 
-    # Create linkage matrix and then plot the dendrogram
-    linkage_matrix = np.column_stack([children, distance, no_of_observations]).astype(float)
+#     # Create linkage matrix and then plot the dendrogram
+#     linkage_matrix = np.column_stack([children, distance, no_of_observations]).astype(float)
 
-    # Plot the corresponding dendrogram
-    dendrogram(linkage_matrix, **kwargs)
-
-
-model = AgglomerativeClustering(linkage='average',n_clusters= 15, affinity = 'precomputed')
-
-model = model.fit(dist)
-fig,ax = plt.subplots(figsize = (45,45),dpi=400)
-plt.title('Hierarchical Clustering Dendrogram')
-plot_dendrogram(model, labels=model.labels_, orientation='left',truncate_mode='level',p=12)
-plt.show()
-plt.savefig(r'F:\Mestrado\Computacao\KDD\TrabalhoFinal\apresentacao\dendogramDist.pdf')  
-
-# NEW CODE - CHANGED 13/11/2019
-##########################################################################################################################################################################
-## Reduce dimensions using MCA algorithm
-dum = pd.get_dummies(exp_rest['categories'])
-num_col = len(dum.columns)
-mca_ben = mca.MCA(dum,ncols=num_col)
-teste = (mca_ben.fs_r())
-factor = mca_ben.fs_r(N=2).T
-teste.L
-
-factort = factor.T 
-factort[:,0]
-exp_rest['Fac1'] = factort[:,0].tolist()
-exp_rest['Fac2'] = factort[:,1].tolist()
+#     # Plot the corresponding dendrogram
+#     dendrogram(linkage_matrix, **kwargs)
 
 
+# model = AgglomerativeClustering(linkage='average',n_clusters= 15, affinity = 'precomputed')
+
+# model = model.fit(dist)
+# fig,ax = plt.subplots(figsize = (45,45),dpi=400)
+# plt.title('Hierarchical Clustering Dendrogram')
+# plot_dendrogram(model, labels=model.labels_, orientation='left',truncate_mode='level',p=12)
+# plt.show()
+# plt.savefig(r'images/dendogramDist.pdf')  
+
+# # NEW CODE - CHANGED 13/11/2019
+# ##########################################################################################################################################################################
+# ## Reduce dimensions using MCA algorithm
+# dum = pd.get_dummies(exp_rest['categories'])
+# num_col = len(dum.columns)
+# mca_ben = mca.MCA(dum,ncols=num_col)
+# teste = mca_ben.fs_r()
+# factor = mca_ben.fs_r(N=2).T
+# teste.L
+
+# factort = factor.T 
+# factort[:,0]
+# exp_rest['Fac1'] = factort[:,0].tolist()
+# exp_rest['Fac2'] = factort[:,1].tolist()
 
 
-mca = prince.MCA(
-     n_components=2,
-     n_iter=3,
-     copy=True,
-     check_input=True,
-     engine='auto',
-     random_state=42
-                 )
-mca = mca.fit(dum)
-mca.eigenvalues_
-mca.total_inertia_
 
-ax = mca.plot_coordinates(
-    X=dum,
-    ax=None,
-    figsize=(6, 6),
-    show_row_points=True,
-    row_points_size=10,
-    show_row_labels=False,
-    show_column_points=True,
-    column_points_size=30,
-    show_column_labels=False,
-    legend_n_cols=1
-    )
-## End of pre-processing
+
+# mca = prince.MCA(
+#      n_components=2,
+#      n_iter=3,
+#      copy=True,
+#      check_input=True,
+#      engine='auto',
+#      random_state=42
+#                  )
+# mca = mca.fit(dum)
+# mca.eigenvalues_
+# mca.total_inertia_
+
+# ax = mca.plot_coordinates(
+#     X=dum,
+#     ax=None,
+#     figsize=(6, 6),
+#     show_row_points=True,
+#     row_points_size=10,
+#     show_row_labels=False,
+#     show_column_points=True,
+#     column_points_size=30,
+#     show_column_labels=False,
+#     legend_n_cols=1
+#     )
+# ## End of pre-processing
         
-##Start K-prototypes algorithm 
-#Choose fields that will be considered and ensure things are dtype="category" (cast)
-categorical_field_names = [ 'GoodForKids', 'stars','RestaurantsPriceRange2']
-for c in categorical_field_names:
-    exp_rest[c] = exp_rest[c].astype('category')
-#       get a list of the catgorical indicies    
-categoricals_indicies = []
-for col in categorical_field_names:
-        categoricals_indicies.append(categorical_field_names.index(col))
+# ##Start K-prototypes algorithm 
+# #Choose fields that will be considered and ensure things are dtype="category" (cast)
+# categorical_field_names = [ 'GoodForKids', 'stars','RestaurantsPriceRange2']
+# for c in categorical_field_names:
+#     exp_rest[c] = exp_rest[c].astype('category')
+# #       get a list of the catgorical indicies    
+# categoricals_indicies = []
+# for col in categorical_field_names:
+#         categoricals_indicies.append(categorical_field_names.index(col))
         
-#       add non-categorical fields
-#
-fields = list(categorical_field_names)
+# #       add non-categorical fields
+# #
+# fields = list(categorical_field_names)
 
-##test changing values of lat long to 
+# ##test changing values of lat long to 
 
-fields.append('latitude')
-fields.append('longitude')
-fields.append('Fac1')
-fields.append('Fac2')
-#
-#       select fields
-columns_to_normalize     = ['latitude', 'longitude', 'Fac1', 'Fac2']
-meanlat = exp_rest['latitude'].mean()
-meanlong = exp_rest['longitude'].mean()
-stdlat = np.std(exp_rest['latitude'])
-stdlong = np.std(exp_rest['longitude'])
-exp_rest[columns_to_normalize] = exp_rest[columns_to_normalize].apply(lambda x: (x - x.mean()) / np.std(x))
+# fields.append('latitude')
+# fields.append('longitude')
+# fields.append('Fac1')
+# fields.append('Fac2')
+# #
+# #       select fields
+# columns_to_normalize     = ['latitude', 'longitude', 'Fac1', 'Fac2']
+# meanlat = exp_rest['latitude'].mean()
+# meanlong = exp_rest['longitude'].mean()
+# stdlat = np.std(exp_rest['latitude'])
+# stdlong = np.std(exp_rest['longitude'])
+# exp_rest[columns_to_normalize] = exp_rest[columns_to_normalize].apply(lambda x: (x - x.mean()) / np.std(x))
 
-data_cats = exp_rest.loc[:,fields]
-#
-#       normalize continous fields
-#
-#       essentially compute the z-score
-#
-#       note: Could use (x.max() - x.min()) instead of np.std(x)
-#
+# data_cats = exp_rest.loc[:,fields]
+# #
+# #       normalize continous fields
+# #
+# #       essentially compute the z-score
+# #
+# #       note: Could use (x.max() - x.min()) instead of np.std(x)
+# #
 
-#
-#       kprototypes needs an array
-#
-data_cats_matrix = data_cats.as_matrix()        
+# #
+# #       kprototypes needs an array
+# #
+# data_cats_matrix = data_cats.as_matrix()        
 
-def evaluate_clusters(final_df,max_clusters):
-    error = np.zeros(max_clusters+1)
-    error[0] = 0;
-    for k in range(1,max_clusters+1):
-        kmeans = KMeans(init='k-means++', n_clusters=k, n_init=10)
-        kmeans.fit_predict(final_df)
-        error[k] = kmeans.inertia_
-    plt.figure(1)
-    plt.plot(range(1,len(error)),error[1:])
-    plt.xlabel('Number of clusters')
-    plt.ylabel('Error')
+# def evaluate_clusters(final_df,max_clusters):
+#     error = np.zeros(max_clusters+1)
+#     error[0] = 0;
+#     for k in range(1,max_clusters+1):
+#         kmeans = KMeans(init='k-means++', n_clusters=k, n_init=10)
+#         kmeans.fit_predict(final_df)
+#         error[k] = kmeans.inertia_
+#     plt.figure(1)
+#     plt.plot(range(1,len(error)),error[1:])
+#     plt.xlabel('Number of clusters')
+#     plt.ylabel('Error')
     
     
-#    def evaluate_clusters(final_df,max_clusters):
-#    error = np.zeros(max_clusters+1)
-#    error[0] = 0;
-#    for k in range(1,max_clusters+1):
-#        kmeans = KMeans(init='k-means++', n_clusters=k, n_init=10)
-#        kmeans.fit_predict(final_df)
-#        labels = kmeans.labels_
-#        print('fddf', labels)
-#        error[k] =  silhouette_score(final_df, labels)
-#    plt.figure(1)
-#    plt.plot(range(1,len(error)),error[1:])
-#    plt.xlabel('Number of clusters')
-#    plt.ylabel('Error')
-#       model parameters
-#
-evalu = data_cats.copy() 
-evalu.drop(['GoodForKids'], axis=1,inplace=True)
-evaluate_clusters(evalu,50)
-init       = 'Huang'                    # init can be 'Cao', 'Huang' or 'random'
-n_clusters =20                        # how many clusters (hyper parameter)
-max_iter   = 100                        # default 100
+# #    def evaluate_clusters(final_df,max_clusters):
+# #    error = np.zeros(max_clusters+1)
+# #    error[0] = 0;
+# #    for k in range(1,max_clusters+1):
+# #        kmeans = KMeans(init='k-means++', n_clusters=k, n_init=10)
+# #        kmeans.fit_predict(final_df)
+# #        labels = kmeans.labels_
+# #        print('fddf', labels)
+# #        error[k] =  silhouette_score(final_df, labels)
+# #    plt.figure(1)
+# #    plt.plot(range(1,len(error)),error[1:])
+# #    plt.xlabel('Number of clusters')
+# #    plt.ylabel('Error')
+# #       model parameters
+# #
+# evalu = data_cats.copy() 
+# evalu.drop(['GoodForKids'], axis=1,inplace=True)
+# evaluate_clusters(evalu,50)
+# init       = 'Huang'                    # init can be 'Cao', 'Huang' or 'random'
+# n_clusters =20                        # how many clusters (hyper parameter)
+# max_iter   = 100                        # default 100
 
-#       get the model
-#
-kproto = KPrototypes(n_clusters=n_clusters,init=init,verbose=2)
-#
-#       fit/predict
-#
-clusters = kproto.fit_predict(data_cats_matrix,categorical=categoricals_indicies)
-#
-#       combine dataframe entries with resultant cluster_id
-#
-proto_cluster_assignments = zip(data_cats_matrix,clusters)        
-
-
-#       Instantiate dataframe to house new cluster data
-#
-cluster_df = pd.DataFrame(columns=('GoodForKids', 'stars',
-                                   'RestaurantsPriceRange2',
-                                   'latitude', 'longitude','Fac1','Fac2','cluster_id'))
-#
-#       load arrays back into a dataframe
-#
-for array in proto_cluster_assignments:
-        cluster_df = cluster_df.append({'GoodForKids':array[0][0], 'stars':array[0][1],
-                                    'RestaurantsPriceRange2':array[0][2],'latitude':array[0][3],'longitude':array[0][4],
-                                    'Fac1':array[0][5],'Fac2':array[0][6],'cluster_id':array[1]}, ignore_index=True)
+# #       get the model
+# #
+# kproto = KPrototypes(n_clusters=n_clusters,init=init,verbose=2)
+# #
+# #       fit/predict
+# #
+# clusters = kproto.fit_predict(data_cats_matrix,categorical=categoricals_indicies)
+# #
+# #       combine dataframe entries with resultant cluster_id
+# #
+# proto_cluster_assignments = zip(data_cats_matrix,clusters)        
 
 
-cluster_df.cluster_id.value_counts()
+# #       Instantiate dataframe to house new cluster data
+# #
+# cluster_df = pd.DataFrame(columns=('GoodForKids', 'stars',
+#                                    'RestaurantsPriceRange2',
+#                                    'latitude', 'longitude','Fac1','Fac2','cluster_id'))
+# #
+# #       load arrays back into a dataframe
+# #
+# for array in proto_cluster_assignments:
+#         cluster_df = cluster_df.append({'GoodForKids':array[0][0], 'stars':array[0][1],
+#                                     'RestaurantsPriceRange2':array[0][2],'latitude':array[0][3],'longitude':array[0][4],
+#                                     'Fac1':array[0][5],'Fac2':array[0][6],'cluster_id':array[1]}, ignore_index=True)
 
 
-summary = cluster_df.describe(include="all")
-summary
-summary.to_csv(r'F:\Mestrado\Computacao\KDD\TrabalhoFinal\dados\summary.csv')
+# cluster_df.cluster_id.value_counts()
 
 
-cluster_df.RestaurantsPriceRange2 = cluster_df.RestaurantsPriceRange2.astype(float)
-
-cluster_df.GoodForKids
-d = {'True': True, 'False': False}
-cluster_df.GoodForKids = cluster_df.GoodForKids.map(d)
-cluster_df['GoodForKids'] =cluster_df['GoodForKids'].astype(int)
+# summary = cluster_df.describe(include="all")
+# summary
+# summary.to_csv(r'summary.csv')
 
 
-summary_cluster = cluster_df.groupby('cluster_id').describe(include="all")
-summary_cluster
-summary_cluster.to_csv(r'F:\Mestrado\Computacao\KDD\TrabalhoFinal\dados\summary_cluster50.csv')
-##Ploting location## 
-#loads US/Canada shapefile
-world = gpd.read_file('F:\Mestrado\Computacao\KDD\TrabalhoFinal\dados\shape_mundo\World_Countries.shp')
-toronto_boundaries = gpd.read_file(r'F:\Mestrado\Computacao\KDD\TrabalhoFinal\dados\toronto_boundaries\toronto_boundaries.shp')
-#Plots the world shape
-#world.plot(ax=ax, alpha=0.4, color="grey")
-#Set CRS as 4326 (WGS84)
-crs = {'init': 'epsg:4326'}    
+# cluster_df.RestaurantsPriceRange2 = cluster_df.RestaurantsPriceRange2.astype(float)
 
-# Create a list with the pair of coordinate (LONG,LAT)    
-geometry = [Point(xy) for xy in zip (cluster_df["longitude"]*stdlong+meanlong,cluster_df["latitude"]*stdlat+meanlat)]
-geometry
-# Create a datafreme with the column geometry and the crs
-geo_df = gpd.GeoDataFrame(cluster_df,crs=crs, geometry=geometry)
-
-#Sets the size of the graph
-fig,ax = plt.subplots(figsize = (15,15))
-
-#Plots the world shape
-#world.plot(ax=ax, alpha=0.4, color="grey")
-toronto_boundaries.plot(ax=ax, alpha=0.4, color="grey")
-#Plots the points
-geo_df.plot(ax=ax, markersize=20)
-plt.title('Algorithm: K-Means - Number of clusters: {}'.format(n_clusters))
-plt.show()
+# cluster_df.GoodForKids
+# d = {'True': True, 'False': False}
+# cluster_df.GoodForKids = cluster_df.GoodForKids.map(d)
+# cluster_df['GoodForKids'] =cluster_df['GoodForKids'].astype(int)
 
 
+# summary_cluster = cluster_df.groupby('cluster_id').describe(include="all")
+# summary_cluster
+# summary_cluster.to_csv(r'summary_cluster50.csv')
+# ##Ploting location## 
+# #loads US/Canada shapefile
+# world = gpd.read_file('World_Countries.shp')
+# toronto_boundaries = gpd.read_file(r'toronto_boundaries.shp')
+# #Plots the world shape
+# #world.plot(ax=ax, alpha=0.4, color="grey")
+# #Set CRS as 4326 (WGS84)
+# crs = {'init': 'epsg:4326'}    
 
-print ('elem clus: ', cluster_df.RestaurantsPriceRange2[cluster_df['cluster_id'] == 5])
-geo_df.to_file(driver = 'ESRI Shapefile', filename= "cluster_toronto.shp")
-X = distance.cdist([cluster_df["longitude"], cluster_df["latitude"]],[cluster_df["longitude"], cluster_df["latitude"]] ,'euclidean')
-silhouette_avg = silhouette_score(X,cluster_df['cluster_id'], metric="precomputed")
-print("For n_clusters =",n_clusters,
-          "The average silhouette_score is :", silhouette_avg)
+# # Create a list with the pair of coordinate (LONG,LAT)    
+# geometry = [Point(xy) for xy in zip (cluster_df["longitude"]*stdlong+meanlong,cluster_df["latitude"]*stdlat+meanlat)]
+# geometry
+# # Create a datafreme with the column geometry and the crs
+# geo_df = gpd.GeoDataFrame(cluster_df,crs=crs, geometry=geometry)
+
+# #Sets the size of the graph
+# fig,ax = plt.subplots(figsize = (15,15))
+
+# #Plots the world shape
+# #world.plot(ax=ax, alpha=0.4, color="grey")
+# toronto_boundaries.plot(ax=ax, alpha=0.4, color="grey")
+# #Plots the points
+# geo_df.plot(ax=ax, markersize=20)
+# plt.title('Algorithm: K-Means - Number of clusters: {}'.format(n_clusters))
+# plt.show()
 
 
 
-# k-MEANS 
-X = restaurants_and_food_j[['latitude', 'longitude']].values
-kmean = KMeans(n_clusters=20).fit(X)
-cluster_df['cluster_K'] = kmean.predict(X).tolist()
-#cluster_df['cluster_K'].value_counts()
-summary_kmean = cluster_df.groupby('cluster_K').describe(include="all")
-summary_kmean
-summary_kmean.to_csv(r'F:\Mestrado\Computacao\KDD\TrabalhoFinal\dados\summary_kmean50.csv')
+# print ('elem clus: ', cluster_df.RestaurantsPriceRange2[cluster_df['cluster_id'] == 5])
+# geo_df.to_file(driver = 'ESRI Shapefile', filename= "cluster_toronto.shp")
+# X = distance.cdist([cluster_df["longitude"], cluster_df["latitude"]],[cluster_df["longitude"], cluster_df["latitude"]] ,'euclidean')
+# silhouette_avg = silhouette_score(X,cluster_df['cluster_id'], metric="precomputed")
+# print("For n_clusters =",n_clusters,
+#           "The average silhouette_score is :", silhouette_avg)
+
+
+
+# # k-MEANS 
+# X = restaurants_and_food_j[['latitude', 'longitude']].values
+# kmean = KMeans(n_clusters=20).fit(X)
+# cluster_df['cluster_K'] = kmean.predict(X).tolist()
+# #cluster_df['cluster_K'].value_counts()
+# summary_kmean = cluster_df.groupby('cluster_K').describe(include="all")
+# summary_kmean
+# summary_kmean.to_csv(r'summary_kmean50.csv')
