@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+
 """
 Created on Tue Nov  5 10:36:18 2019
 
@@ -29,7 +30,7 @@ from scipy.cluster.hierarchy import dendrogram, linkage
 ####preliminary analisys####
 
 #Loads all business in business.json
-business = pd.read_json(r'F:\Mestrado\Computacao\KDD\TrabalhoFinal\dados\business.json', lines=True)
+business = pd.read_json(r'business.json', lines=True)
 business.columns
 # Get names of indexes for which column city has value different from Toronto
 indexNames = business[ business['city'] != "Toronto" ].index
