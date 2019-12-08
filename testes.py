@@ -388,30 +388,31 @@ dist =normalize((dist_alcohol  + dist_ambience + dist_nights + dist_dietary + di
 
 
 
-## calculates silhoette coeficient in a max number of cluster and plots it
+# calculates silhoette coeficient in a max number of cluster and plots it
 def evaluate_silhoette(dist, max_clusters):
     error = np.zeros(max_clusters+1)
     # error[0] = 0;
     link = ['complete', 'average', 'single']
     fig, ax = plt.subplots()
     for i in link:        
-        for k in range(19,max_clusters+1):
+        for k in range(2,max_clusters+1):
            model2 = AgglomerativeClustering(linkage=i,n_clusters= k, affinity = 'precomputed')
            labels = model2.fit_predict(dist)
            error[k] = silhouette_score(dist, labels, metric='precomputed')
            print('N_cluster: ',k, 'Avg silhoette: ',error[k])
-           ax.plot(range(1,len(error)),error[1:],label="%s,%i" % (i,k))
+           
+        ax.plot(range(1,len(error)),error[1:],label=i)#"%s,%i" % (i,k))
 
     plt.title('Agglomerative Clustering')
     plt.xlabel('Number of clusters')
     plt.ylabel('Silhoette coeficient')
     plt.legend(title='Linkage criteria:')
-    plt.xlim(18,20)
+    plt.xlim(2,20)
     plt.show()
 
 evaluate_silhoette(dist, 20)
 
-# #plot dendogram
+#plot dendogram
 # def plot_dendrogram(model, **kwargs):
 
 #     # Children of hierarchical clustering
@@ -429,6 +430,38 @@ evaluate_silhoette(dist, 20)
 
 #     # Plot the corresponding dendrogram
 #     dendrogram(linkage_matrix, **kwargs)
+
+
+##########################################################################################################################################################################
+
+'''
+Aplication of the Principal Component Method to the distance matrix (without normalization)
+Following the procedure in https://towardsdatascience.com/pca-using-python-scikit-learn-e653f8989e60
+Author: Nicolau Santos (08/12/2019)
+'''
+
+# Distance matrix created from the sum of the distance considering each feature
+
+# from sklearn.preprocessing import StandardScaler
+# features = ['sepal length', 'sepal width', 'petal length', 'petal width']
+# # Separating out the features
+# x = df.loc[:, features].values
+# # Separating out the target
+# y = df.loc[:,['target']].values
+# # Standardizing the features
+# x = StandardScaler().fit_transform(x)
+
+# from sklearn.decomposition import PCA
+# pca = PCA(n_components=2)
+# principalComponents = pca.fit_transform(x)
+# principalDf = pd.DataFrame(data = principalComponents, columns = ['principal component 1', 'principal component 2'])
+
+
+##########################################################################################################################################################################
+
+
+
+
 
 
 # model = AgglomerativeClustering(linkage='average',n_clusters= 15, affinity = 'precomputed')
@@ -454,8 +487,6 @@ evaluate_silhoette(dist, 20)
 # factort[:,0]
 # exp_rest['Fac1'] = factort[:,0].tolist()
 # exp_rest['Fac2'] = factort[:,1].tolist()
-
-
 
 
 # mca = prince.MCA(
