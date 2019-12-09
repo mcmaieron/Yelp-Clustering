@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 """
 Created on Tue Nov  5 10:36:18 2019
 
@@ -25,11 +24,13 @@ from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics.pairwise import cosine_distances
 from sklearn.feature_extraction.text import CountVectorizer
 from scipy.cluster.hierarchy import dendrogram, linkage
-
+from itertools import combinations
+from pyclustering.cluster.kmedoids import kmedoids
+#from fuzzywuzzy import fuzz
 ####preliminary analisys####
 
 #Loads all business in business.json
-business = pd.read_json(r'business.json', lines=True)
+business = pd.read_json(r'F:\Mestrado\Computacao\KDD\TrabalhoFinal\dados\business.json', lines=True)
 business.columns
 # Get names of indexes for which column city has value different from Toronto
 indexNames = business[ business['city'] != "Toronto" ].index
@@ -326,6 +327,8 @@ dist_appo = calc_dist_bool(exp_rest['ByAppointmentOnly'])
 dist_happy = calc_dist_bool(exp_rest['HappyHour'])
 dist_coat = calc_dist_bool(exp_rest['CoatCheck'])
 
+
+
 #w = len(exp_rest.index)
 #dist = np.zeros(shape=(w,w))
 #for j in exp_rest:
@@ -377,18 +380,18 @@ dist_meal = calc_dist_text(exp_rest.GoodForMeal)
 dist_dietary = calc_dist_text(exp_rest.DietaryRestrictions)
 
 
-# Sum all distance matrix and normalizes
+# Final distance matrix with 31 variables
 
-dist =normalize((dist_alcohol  + dist_ambience + dist_nights + dist_dietary + dist_meal 
+dist =normalize((dist_alcohol  + dist_ambience + dist_dietary + dist_meal 
 + dist_nights + dist_music + dist_smoking + dist_wifi + dist_noise + dist_att 
 + dist_business + dist_cat + dist_coat + dist_happy+ dist_appo + dist_drive 
 + dist_table + dist_tv + dist_dogs + dist_dancing + dist_wheel + dist_groups  
-+ dist_delivery + dist_out + dist_kids + dist_caters + dist_take
++ dist_delivery + dist_out + dist_kids + dist_caters + dist_take+dist_reservations
 + dist_bike + dist_price + dist_stars),norm='max')
 
 
+## calculates silhoette coeficient in a max number of cluster and plots it
 
-# calculates silhoette coeficient in a max number of cluster and plots it
 def evaluate_silhoette(dist, max_clusters):
     error = np.zeros(max_clusters+1)
     # error[0] = 0;
@@ -410,277 +413,372 @@ def evaluate_silhoette(dist, max_clusters):
     plt.xlim(2,20)
     plt.show()
 
-evaluate_silhoette(dist, 20)
+evaluate_silhoette(dist, 30)
+
+# Calculated the silhoette coeficient of the final distance matrix with the best
+# linkage criteria and number of clusters
+model = AgglomerativeClustering(linkage='average',n_clusters= 12, affinity = 'precomputed')
+model31l = model.fit_predict(dist) #vector with the group labels
+error = silhouette_score(dist, model31l, metric='precomputed')
+print('silhoette: ',error)
 
 #plot dendogram
-# def plot_dendrogram(model, **kwargs):
+def plot_dendrogram(model, **kwargs):
 
-#     # Children of hierarchical clustering
-#     children = model.children_
+    # Children of hierarchical clustering
+    children = model.children_
 
-#     # Distances between each pair of children
-#     # Since we don't have this information, we can use a uniform one for plotting
-#     distance = np.arange(children.shape[0])
+    # Distances between each pair of children
+    # Since we don't have this information, we can use a uniform one for plotting
+    distance = np.arange(children.shape[0])
 
-#     # The number of observations contained in each cluster level
-#     no_of_observations = np.arange(2, children.shape[0]+2)
+    # The number of observations contained in each cluster level
+    no_of_observations = np.arange(2, children.shape[0]+2)
 
-#     # Create linkage matrix and then plot the dendrogram
-#     linkage_matrix = np.column_stack([children, distance, no_of_observations]).astype(float)
+    # Create linkage matrix and then plot the dendrogram
+    linkage_matrix = np.column_stack([children, distance, no_of_observations]).astype(float)
 
-#     # Plot the corresponding dendrogram
-#     dendrogram(linkage_matrix, **kwargs)
+    # Plot the corresponding dendrogram
+    dendrogram(linkage_matrix, **kwargs)
+    
+model31 = model.fit(dist)
+fig,ax = plt.subplots(figsize = (45,45),dpi=200)
+plt.title('Hierarchical Clustering Dendrogram 31 features - silhoette coeficient: "%.2f" ' % error)
+plot_dendrogram(model31, labels=model31.labels_, orientation='left',truncate_mode='level',p=12)
+plt.savefig(r'F:\Mestrado\Computacao\KDD\TrabalhoFinal\apresentacao\dendogramDist31.pdf')  
 
 
+
+# Sum all distance matrix and normalizes. After silhoette coeficient analisys,
+# the features that have negative impact in the model were removed
+dist24 =normalize((dist_alcohol+dist_reservations
++ dist_smoking + dist_wifi + dist_noise + dist_att 
++ dist_business + dist_cat + dist_coat + dist_happy + dist_drive 
++ dist_table + dist_tv + dist_dogs + dist_dancing + dist_wheel + dist_groups  
++ dist_delivery + dist_out + dist_caters + dist_take
++ dist_bike + dist_price + dist_stars),norm='max')
+
+model24 = model.fit(dist)
+model24l = model.fit_predict(dist24) #vector with the group labels
+error24 = silhouette_score(dist24, model24l, metric='precomputed')
+fig,ax = plt.subplots(figsize = (45,45),dpi=200)
+plt.title('Hierarchical Clustering Dendrogram 24 features - silhoette coeficient: "%.2f" ' % error24)
+plot_dendrogram(model24, labels=model24.labels_, orientation='left',truncate_mode='level',p=12)
+plt.savefig(r'F:\Mestrado\Computacao\KDD\TrabalhoFinal\apresentacao\dendogramDist24.pdf') 
+
+
+features = ['dist_stars','dist_groups','dist_alcohol','dist_reservations','dist_wifi'
+            ,'dist_take','dist_dancing','dist_smoking','dist_noise','dist_out'
+            ,'dist_caters','dist_delivery','dist_table','dist_wheel','dist_price'
+            ,'dist_bike','dist_cat','dist_att','dist_business','dist_price'
+            ,'dist_coat','dist_happy','dist_drive','dist_tv','dist_dogs'           
+            ]
+
+#verify and order variance
+var_st=np.var(dist_price)
+var1 = np.empty(len(features), dtype=float)
+for i in range(0,len(features)):
+    print(':',i)
+    var1[i]=np.var(globals()[features[i]])
+var2 = np.sort(var1)
+#analisys of dimensionality efect
+
+
+#calculates distance matrix using 5 variables
+dist5 = normalize((dist_stars + dist_cat+dist_price+dist_groups + dist_alcohol 
+                   ),norm='max')
+
+#calculates distance matrix using 10 variables
+dist10 = normalize((dist_stars + dist_cat+dist_price
+                    +dist_groups + dist_alcohol + dist_reservations
+                    +dist_wifi+ dist_take+dist_noise+dist_out
+                    ),norm='max')
+
+#calculates distance matrix using 15 variables
+dist15 = normalize((dist_stars + dist_cat+dist_price
+                    +dist_groups + dist_alcohol + dist_reservations
+                    +dist_wifi+ dist_take+dist_noise+dist_out
+                    +dist_caters+dist_delivery+dist_table+dist_bike+dist_tv
+                    ),norm='max')
+
+#clustering with reduced dimensionality
+model5 = model.fit_predict(dist5) #vector with the group labels
+error5 = silhouette_score(dist5, model5, metric='precomputed')
+print('silhoette 5 dimension: ',error5)
+
+model10 = model.fit_predict(dist10) #vector with the group labels
+error10 = silhouette_score(dist10, model10, metric='precomputed')
+print('silhoette 10 dimension: ',error10)
+
+model15 = model.fit_predict(dist15) #vector with the group labels
+error15 = silhouette_score(dist15, model15, metric='precomputed')
+print('silhoette 15 dimension: ',error15)
+
+
+    
+model5 = model.fit(dist5)
+fig,ax = plt.subplots(figsize = (45,45),dpi=200)
+plt.title('Hierarchical Clustering Dendrogram 5 features - silhoette coeficient: "%.2f" ' % error5)
+plot_dendrogram(model5, labels=model5.labels_, orientation='left',truncate_mode='level',p=12)
+plt.savefig(r'F:\Mestrado\Computacao\KDD\TrabalhoFinal\apresentacao\dendogram5.pdf')  
+
+model10 = model.fit(dist10)
+fig,ax = plt.subplots(figsize = (45,45),dpi=200)
+plt.title('Hierarchical Clustering Dendrogram 10 features - silhoette coeficient: "%.2f" ' % error10)
+plot_dendrogram(model10, labels=model10.labels_, orientation='left',truncate_mode='level',p=12)
+plt.savefig(r'F:\Mestrado\Computacao\KDD\TrabalhoFinal\apresentacao\dendogram10.pdf') 
+
+model15 = model.fit(dist15)
+fig,ax = plt.subplots(figsize = (45,45),dpi=200)
+plt.title('Hierarchical Clustering Dendrogram 15 features - silhoette coeficient: "%.2f" '% error15)
+plot_dendrogram(model15, labels=model15.labels_, orientation='left',truncate_mode='level',p=12)
+plt.savefig(r'F:\Mestrado\Computacao\KDD\TrabalhoFinal\apresentacao\dendogram15.pdf') 
+
+
+## compare with k-meidoids
+
+initial_medoids=[1,2,3,4,5,6,7,8,9,10,11,12]
+
+# create K-Medoids algorithm for processing distance matrix instead of points
+kmedoids_instance31 = kmedoids(dist, initial_medoids, data_type='distance_matrix')
+# run cluster analysis and obtain results
+kmedoids_instance31.process()
+clusters31 = kmedoids_instance31.get_clusters()
+medoids31 = kmedoids_instance31.get_medoids()
+
+kmedoids_instance24 = kmedoids(dist24, initial_medoids, data_type='distance_matrix')
+kmedoids_instance24.process()
+clusters24 = kmedoids_instance24.get_clusters()
+medoids24 = kmedoids_instance24.get_medoids()
+
+kmedoids_instance15 = kmedoids(dist15, initial_medoids, data_type='distance_matrix')
+kmedoids_instance15.process()
+clusters15 = kmedoids_instance15.get_clusters()
+medoids15 = kmedoids_instance15.get_medoids()
+
+kmedoids_instance10 = kmedoids(dist10, initial_medoids, data_type='distance_matrix')
+kmedoids_instance10.process()
+clusters10 = kmedoids_instance10.get_clusters()
+medoids10 = kmedoids_instance10.get_medoids()
+
+kmedoids_instance5 = kmedoids(dist5, initial_medoids, data_type='distance_matrix')
+kmedoids_instance5.process()
+clusters5 = kmedoids_instance5.get_clusters()
+medoids5 = kmedoids_instance5.get_medoids()
+
+
+
+
+# NEW CODE - CHANGED 13/11/2019
 ##########################################################################################################################################################################
+## Reduce dimensions using MCA algorithm
+dum = pd.get_dummies(exp_rest['categories'])
+num_col = len(dum.columns)
+mca_ben = mca.MCA(dum,ncols=num_col)
+teste = (mca_ben.fs_r())
+factor = mca_ben.fs_r(N=2).T
+teste.L
 
-'''
-Aplication of the Principal Component Method to the distance matrix (without normalization)
-Following the procedure in https://towardsdatascience.com/pca-using-python-scikit-learn-e653f8989e60
-Author: Nicolau Santos (08/12/2019)
-'''
-
-# Distance matrix created from the sum of the distance considering each feature
-
-# from sklearn.preprocessing import StandardScaler
-# features = ['sepal length', 'sepal width', 'petal length', 'petal width']
-# # Separating out the features
-# x = df.loc[:, features].values
-# # Separating out the target
-# y = df.loc[:,['target']].values
-# # Standardizing the features
-# x = StandardScaler().fit_transform(x)
-
-# from sklearn.decomposition import PCA
-# pca = PCA(n_components=2)
-# principalComponents = pca.fit_transform(x)
-# principalDf = pd.DataFrame(data = principalComponents, columns = ['principal component 1', 'principal component 2'])
-
-
-##########################################################################################################################################################################
+factort = factor.T 
+factort[:,0]
+exp_rest['Fac1'] = factort[:,0].tolist()
+exp_rest['Fac2'] = factort[:,1].tolist()
 
 
 
 
+mca = prince.MCA(
+     n_components=2,
+     n_iter=3,
+     copy=True,
+     check_input=True,
+     engine='auto',
+     random_state=42
+                 )
+mca = mca.fit(dum)
+mca.eigenvalues_
+mca.total_inertia_
 
-
-# model = AgglomerativeClustering(linkage='average',n_clusters= 15, affinity = 'precomputed')
-
-# model = model.fit(dist)
-# fig,ax = plt.subplots(figsize = (45,45),dpi=400)
-# plt.title('Hierarchical Clustering Dendrogram')
-# plot_dendrogram(model, labels=model.labels_, orientation='left',truncate_mode='level',p=12)
-# plt.show()
-# plt.savefig(r'images/dendogramDist.pdf')  
-
-# # NEW CODE - CHANGED 13/11/2019
-# ##########################################################################################################################################################################
-# ## Reduce dimensions using MCA algorithm
-# dum = pd.get_dummies(exp_rest['categories'])
-# num_col = len(dum.columns)
-# mca_ben = mca.MCA(dum,ncols=num_col)
-# teste = mca_ben.fs_r()
-# factor = mca_ben.fs_r(N=2).T
-# teste.L
-
-# factort = factor.T 
-# factort[:,0]
-# exp_rest['Fac1'] = factort[:,0].tolist()
-# exp_rest['Fac2'] = factort[:,1].tolist()
-
-
-# mca = prince.MCA(
-#      n_components=2,
-#      n_iter=3,
-#      copy=True,
-#      check_input=True,
-#      engine='auto',
-#      random_state=42
-#                  )
-# mca = mca.fit(dum)
-# mca.eigenvalues_
-# mca.total_inertia_
-
-# ax = mca.plot_coordinates(
-#     X=dum,
-#     ax=None,
-#     figsize=(6, 6),
-#     show_row_points=True,
-#     row_points_size=10,
-#     show_row_labels=False,
-#     show_column_points=True,
-#     column_points_size=30,
-#     show_column_labels=False,
-#     legend_n_cols=1
-#     )
-# ## End of pre-processing
+ax = mca.plot_coordinates(
+    X=dum,
+    ax=None,
+    figsize=(6, 6),
+    show_row_points=True,
+    row_points_size=10,
+    show_row_labels=False,
+    show_column_points=True,
+    column_points_size=30,
+    show_column_labels=False,
+    legend_n_cols=1
+    )
+## End of pre-processing
         
-# ##Start K-prototypes algorithm 
-# #Choose fields that will be considered and ensure things are dtype="category" (cast)
-# categorical_field_names = [ 'GoodForKids', 'stars','RestaurantsPriceRange2']
-# for c in categorical_field_names:
-#     exp_rest[c] = exp_rest[c].astype('category')
-# #       get a list of the catgorical indicies    
-# categoricals_indicies = []
-# for col in categorical_field_names:
-#         categoricals_indicies.append(categorical_field_names.index(col))
+##Start K-prototypes algorithm 
+#Choose fields that will be considered and ensure things are dtype="category" (cast)
+categorical_field_names = [ 'GoodForKids', 'stars','RestaurantsPriceRange2']
+for c in categorical_field_names:
+    exp_rest[c] = exp_rest[c].astype('category')
+#       get a list of the catgorical indicies    
+categoricals_indicies = []
+for col in categorical_field_names:
+        categoricals_indicies.append(categorical_field_names.index(col))
         
-# #       add non-categorical fields
-# #
-# fields = list(categorical_field_names)
+#       add non-categorical fields
+#
+fields = list(categorical_field_names)
 
-# ##test changing values of lat long to 
+##test changing values of lat long to 
 
-# fields.append('latitude')
-# fields.append('longitude')
-# fields.append('Fac1')
-# fields.append('Fac2')
-# #
-# #       select fields
-# columns_to_normalize     = ['latitude', 'longitude', 'Fac1', 'Fac2']
-# meanlat = exp_rest['latitude'].mean()
-# meanlong = exp_rest['longitude'].mean()
-# stdlat = np.std(exp_rest['latitude'])
-# stdlong = np.std(exp_rest['longitude'])
-# exp_rest[columns_to_normalize] = exp_rest[columns_to_normalize].apply(lambda x: (x - x.mean()) / np.std(x))
+fields.append('latitude')
+fields.append('longitude')
+fields.append('Fac1')
+fields.append('Fac2')
+#
+#       select fields
+columns_to_normalize     = ['latitude', 'longitude', 'Fac1', 'Fac2']
+meanlat = exp_rest['latitude'].mean()
+meanlong = exp_rest['longitude'].mean()
+stdlat = np.std(exp_rest['latitude'])
+stdlong = np.std(exp_rest['longitude'])
+exp_rest[columns_to_normalize] = exp_rest[columns_to_normalize].apply(lambda x: (x - x.mean()) / np.std(x))
 
-# data_cats = exp_rest.loc[:,fields]
-# #
-# #       normalize continous fields
-# #
-# #       essentially compute the z-score
-# #
-# #       note: Could use (x.max() - x.min()) instead of np.std(x)
-# #
+data_cats = exp_rest.loc[:,fields]
+#
+#       normalize continous fields
+#
+#       essentially compute the z-score
+#
+#       note: Could use (x.max() - x.min()) instead of np.std(x)
+#
 
-# #
-# #       kprototypes needs an array
-# #
-# data_cats_matrix = data_cats.as_matrix()        
+#
+#       kprototypes needs an array
+#
+data_cats_matrix = data_cats.as_matrix()        
 
-# def evaluate_clusters(final_df,max_clusters):
-#     error = np.zeros(max_clusters+1)
-#     error[0] = 0;
-#     for k in range(1,max_clusters+1):
-#         kmeans = KMeans(init='k-means++', n_clusters=k, n_init=10)
-#         kmeans.fit_predict(final_df)
-#         error[k] = kmeans.inertia_
-#     plt.figure(1)
-#     plt.plot(range(1,len(error)),error[1:])
-#     plt.xlabel('Number of clusters')
-#     plt.ylabel('Error')
+def evaluate_clusters(final_df,max_clusters):
+    error = np.zeros(max_clusters+1)
+    error[0] = 0;
+    for k in range(1,max_clusters+1):
+        kmeans = KMeans(init='k-means++', n_clusters=k, n_init=10)
+        kmeans.fit_predict(final_df)
+        error[k] = kmeans.inertia_
+    plt.figure(1)
+    plt.plot(range(1,len(error)),error[1:])
+    plt.xlabel('Number of clusters')
+    plt.ylabel('Error')
     
     
-# #    def evaluate_clusters(final_df,max_clusters):
-# #    error = np.zeros(max_clusters+1)
-# #    error[0] = 0;
-# #    for k in range(1,max_clusters+1):
-# #        kmeans = KMeans(init='k-means++', n_clusters=k, n_init=10)
-# #        kmeans.fit_predict(final_df)
-# #        labels = kmeans.labels_
-# #        print('fddf', labels)
-# #        error[k] =  silhouette_score(final_df, labels)
-# #    plt.figure(1)
-# #    plt.plot(range(1,len(error)),error[1:])
-# #    plt.xlabel('Number of clusters')
-# #    plt.ylabel('Error')
-# #       model parameters
-# #
-# evalu = data_cats.copy() 
-# evalu.drop(['GoodForKids'], axis=1,inplace=True)
-# evaluate_clusters(evalu,50)
-# init       = 'Huang'                    # init can be 'Cao', 'Huang' or 'random'
-# n_clusters =20                        # how many clusters (hyper parameter)
-# max_iter   = 100                        # default 100
+#    def evaluate_clusters(final_df,max_clusters):
+#    error = np.zeros(max_clusters+1)
+#    error[0] = 0;
+#    for k in range(1,max_clusters+1):
+#        kmeans = KMeans(init='k-means++', n_clusters=k, n_init=10)
+#        kmeans.fit_predict(final_df)
+#        labels = kmeans.labels_
+#        print('fddf', labels)
+#        error[k] =  silhouette_score(final_df, labels)
+#    plt.figure(1)
+#    plt.plot(range(1,len(error)),error[1:])
+#    plt.xlabel('Number of clusters')
+#    plt.ylabel('Error')
+#       model parameters
+#
+evalu = data_cats.copy() 
+evalu.drop(['GoodForKids'], axis=1,inplace=True)
+evaluate_clusters(evalu,50)
+init       = 'Huang'                    # init can be 'Cao', 'Huang' or 'random'
+n_clusters =20                        # how many clusters (hyper parameter)
+max_iter   = 100                        # default 100
 
-# #       get the model
-# #
-# kproto = KPrototypes(n_clusters=n_clusters,init=init,verbose=2)
-# #
-# #       fit/predict
-# #
-# clusters = kproto.fit_predict(data_cats_matrix,categorical=categoricals_indicies)
-# #
-# #       combine dataframe entries with resultant cluster_id
-# #
-# proto_cluster_assignments = zip(data_cats_matrix,clusters)        
-
-
-# #       Instantiate dataframe to house new cluster data
-# #
-# cluster_df = pd.DataFrame(columns=('GoodForKids', 'stars',
-#                                    'RestaurantsPriceRange2',
-#                                    'latitude', 'longitude','Fac1','Fac2','cluster_id'))
-# #
-# #       load arrays back into a dataframe
-# #
-# for array in proto_cluster_assignments:
-#         cluster_df = cluster_df.append({'GoodForKids':array[0][0], 'stars':array[0][1],
-#                                     'RestaurantsPriceRange2':array[0][2],'latitude':array[0][3],'longitude':array[0][4],
-#                                     'Fac1':array[0][5],'Fac2':array[0][6],'cluster_id':array[1]}, ignore_index=True)
+#       get the model
+#
+kproto = KPrototypes(n_clusters=n_clusters,init=init,verbose=2)
+#
+#       fit/predict
+#
+clusters = kproto.fit_predict(data_cats_matrix,categorical=categoricals_indicies)
+#
+#       combine dataframe entries with resultant cluster_id
+#
+proto_cluster_assignments = zip(data_cats_matrix,clusters)        
 
 
-# cluster_df.cluster_id.value_counts()
+#       Instantiate dataframe to house new cluster data
+#
+cluster_df = pd.DataFrame(columns=('GoodForKids', 'stars',
+                                   'RestaurantsPriceRange2',
+                                   'latitude', 'longitude','Fac1','Fac2','cluster_id'))
+#
+#       load arrays back into a dataframe
+#
+for array in proto_cluster_assignments:
+        cluster_df = cluster_df.append({'GoodForKids':array[0][0], 'stars':array[0][1],
+                                    'RestaurantsPriceRange2':array[0][2],'latitude':array[0][3],'longitude':array[0][4],
+                                    'Fac1':array[0][5],'Fac2':array[0][6],'cluster_id':array[1]}, ignore_index=True)
 
 
-# summary = cluster_df.describe(include="all")
-# summary
-# summary.to_csv(r'summary.csv')
+cluster_df.cluster_id.value_counts()
 
 
-# cluster_df.RestaurantsPriceRange2 = cluster_df.RestaurantsPriceRange2.astype(float)
-
-# cluster_df.GoodForKids
-# d = {'True': True, 'False': False}
-# cluster_df.GoodForKids = cluster_df.GoodForKids.map(d)
-# cluster_df['GoodForKids'] =cluster_df['GoodForKids'].astype(int)
+summary = cluster_df.describe(include="all")
+summary
+summary.to_csv(r'F:\Mestrado\Computacao\KDD\TrabalhoFinal\dados\summary.csv')
 
 
-# summary_cluster = cluster_df.groupby('cluster_id').describe(include="all")
-# summary_cluster
-# summary_cluster.to_csv(r'summary_cluster50.csv')
-# ##Ploting location## 
-# #loads US/Canada shapefile
-# world = gpd.read_file('World_Countries.shp')
-# toronto_boundaries = gpd.read_file(r'toronto_boundaries.shp')
-# #Plots the world shape
-# #world.plot(ax=ax, alpha=0.4, color="grey")
-# #Set CRS as 4326 (WGS84)
-# crs = {'init': 'epsg:4326'}    
+cluster_df.RestaurantsPriceRange2 = cluster_df.RestaurantsPriceRange2.astype(float)
 
-# # Create a list with the pair of coordinate (LONG,LAT)    
-# geometry = [Point(xy) for xy in zip (cluster_df["longitude"]*stdlong+meanlong,cluster_df["latitude"]*stdlat+meanlat)]
-# geometry
-# # Create a datafreme with the column geometry and the crs
-# geo_df = gpd.GeoDataFrame(cluster_df,crs=crs, geometry=geometry)
-
-# #Sets the size of the graph
-# fig,ax = plt.subplots(figsize = (15,15))
-
-# #Plots the world shape
-# #world.plot(ax=ax, alpha=0.4, color="grey")
-# toronto_boundaries.plot(ax=ax, alpha=0.4, color="grey")
-# #Plots the points
-# geo_df.plot(ax=ax, markersize=20)
-# plt.title('Algorithm: K-Means - Number of clusters: {}'.format(n_clusters))
-# plt.show()
+cluster_df.GoodForKids
+d = {'True': True, 'False': False}
+cluster_df.GoodForKids = cluster_df.GoodForKids.map(d)
+cluster_df['GoodForKids'] =cluster_df['GoodForKids'].astype(int)
 
 
+summary_cluster = cluster_df.groupby('cluster_id').describe(include="all")
+summary_cluster
+summary_cluster.to_csv(r'F:\Mestrado\Computacao\KDD\TrabalhoFinal\dados\summary_cluster50.csv')
+##Ploting location## 
+#loads US/Canada shapefile
+world = gpd.read_file('F:\Mestrado\Computacao\KDD\TrabalhoFinal\dados\shape_mundo\World_Countries.shp')
+toronto_boundaries = gpd.read_file(r'F:\Mestrado\Computacao\KDD\TrabalhoFinal\dados\toronto_boundaries\toronto_boundaries.shp')
+#Plots the world shape
+#world.plot(ax=ax, alpha=0.4, color="grey")
+#Set CRS as 4326 (WGS84)
+crs = {'init': 'epsg:4326'}    
 
-# print ('elem clus: ', cluster_df.RestaurantsPriceRange2[cluster_df['cluster_id'] == 5])
-# geo_df.to_file(driver = 'ESRI Shapefile', filename= "cluster_toronto.shp")
-# X = distance.cdist([cluster_df["longitude"], cluster_df["latitude"]],[cluster_df["longitude"], cluster_df["latitude"]] ,'euclidean')
-# silhouette_avg = silhouette_score(X,cluster_df['cluster_id'], metric="precomputed")
-# print("For n_clusters =",n_clusters,
-#           "The average silhouette_score is :", silhouette_avg)
+# Create a list with the pair of coordinate (LONG,LAT)    
+geometry = [Point(xy) for xy in zip (cluster_df["longitude"]*stdlong+meanlong,cluster_df["latitude"]*stdlat+meanlat)]
+geometry
+# Create a datafreme with the column geometry and the crs
+geo_df = gpd.GeoDataFrame(cluster_df,crs=crs, geometry=geometry)
+
+#Sets the size of the graph
+fig,ax = plt.subplots(figsize = (15,15))
+
+#Plots the world shape
+#world.plot(ax=ax, alpha=0.4, color="grey")
+toronto_boundaries.plot(ax=ax, alpha=0.4, color="grey")
+#Plots the points
+geo_df.plot(ax=ax, markersize=20)
+plt.title('Algorithm: K-Means - Number of clusters: {}'.format(n_clusters))
+plt.show()
 
 
 
-# # k-MEANS 
-# X = restaurants_and_food_j[['latitude', 'longitude']].values
-# kmean = KMeans(n_clusters=20).fit(X)
-# cluster_df['cluster_K'] = kmean.predict(X).tolist()
-# #cluster_df['cluster_K'].value_counts()
-# summary_kmean = cluster_df.groupby('cluster_K').describe(include="all")
-# summary_kmean
-# summary_kmean.to_csv(r'summary_kmean50.csv')
+print ('elem clus: ', cluster_df.RestaurantsPriceRange2[cluster_df['cluster_id'] == 5])
+geo_df.to_file(driver = 'ESRI Shapefile', filename= "cluster_toronto.shp")
+X = distance.cdist([cluster_df["longitude"], cluster_df["latitude"]],[cluster_df["longitude"], cluster_df["latitude"]] ,'euclidean')
+silhouette_avg = silhouette_score(X,cluster_df['cluster_id'], metric="precomputed")
+print("For n_clusters =",n_clusters,
+          "The average silhouette_score is :", silhouette_avg)
+
+
+
+# k-MEANS 
+X = restaurants_and_food_j[['latitude', 'longitude']].values
+kmean = KMeans(n_clusters=20).fit(X)
+cluster_df['cluster_K'] = kmean.predict(X).tolist()
+#cluster_df['cluster_K'].value_counts()
+summary_kmean = cluster_df.groupby('cluster_K').describe(include="all")
+summary_kmean
+summary_kmean.to_csv(r'F:\Mestrado\Computacao\KDD\TrabalhoFinal\dados\summary_kmean50.csv')
